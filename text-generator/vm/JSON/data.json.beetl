@@ -1,0 +1,7 @@
+import ./fieldValueGenerate.vm;
+
+{
+ <%for(f in fields){%>
+  "${f.name}": ${f.generateValue}${fLP.last?'':","}
+<%}%>
+}

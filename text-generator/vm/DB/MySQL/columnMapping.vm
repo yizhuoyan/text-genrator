@@ -1,0 +1,53 @@
+var PK_TYPE="BIGINT(20)";
+
+
+var determineColumnType=function(field){
+    switch(field.dataType){
+        case "STRING":
+            if(field.min===field.max){
+                return "CHAR("+field.max+")";
+            }else  if(field.max<65535){
+                return "VARCHAR("+field.max+")";
+            }else{
+                return "TEXT";
+            }
+        case  "INTEGER":
+            if(field.max<10){
+                return "INT";
+            }else{
+                return "BIGINT";
+            }
+        case "FLOAT":
+            return  "DECIMAL("+field.max+","+field.scale||0+")";
+
+        case "DATE":
+            return  "DATA";
+        case "TIME":
+            return  "TIME";
+        case "DATETIME":
+            return "DATETIME";
+        case "BOOLEAN":
+            return "TINYINT(1)";
+        case "ENUM":
+            return "INT";
+    }
+    return PK_TYPE;
+
+};
+(function(vm){
+    var fields=vm.fields;
+    var pk=[];
+    for(var i=fields.length;i-->0;){
+        var field=fields[i];
+        field.columnType=determineColumnType(field);
+        field.columnName=$.toUnderlineCase(field.name).toUpperCase();
+        if(field.primary){
+            pk.push(field);
+        }
+       
+    }
+
+    vm.pk=pk[0];
+    vm.pks=pk;
+    return vm;
+})(vm);

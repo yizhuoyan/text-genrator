@@ -1,0 +1,72 @@
+var determineFiledType=function(field,imports){
+    switch(field.dataType){
+        case "STRING":
+            return "String";
+
+        case  "INTEGER":
+            if(field.max<10){
+                return "Integer";
+            }else{
+                return "Long";
+            }
+        case "FLOAT":
+            return  "Double";
+
+        case "DATE":
+            imports.push("java.util.LocalDate");
+            return  "LocalDate";
+        case "TIME":
+            imports.push("java.util.LocalTime");
+            return  "LocalTime";
+        case "DATETIME":
+            imports.push("java.util.LocalDateTime");
+            return "LocalDateTime";
+        case "BOOLEAN":
+            
+            return "Boolean";
+        case "ENUM":
+            imports.push(field.subDataType);
+            return field.subDataType.substr(field.subDataType.lastIndexOf(".")+1);
+        case "LIST":
+            imports.push(field.subDataType);
+            imports.push("java.util.List");
+            var typeName=field.subDataType.substr(field.subDataType.lastIndexOf(".")+1);
+            return "List<"+typeName+">";
+    }
+     imports.push(field.dataType);
+     return field.dataType;
+
+};
+(function(vm){
+    var fields=vm.fields;
+    var fieldsExcludePrimary=[];
+    var fieldsPrimary=[];
+    var imports=[];
+ 
+    for(var i=fields.length;i-->0;){
+        var field=fields[i];
+        field.fieldType=determineFiledType(field,imports);
+        field.fieldName=field.name;
+        if(field.primary){
+            fieldsPrimary.push(field);
+        }else{
+           fieldsExcludePrimary.push(field);
+        }
+    }
+
+   var importsUse=[];
+   
+   for(var i=imports.length;i-->0;){
+        var item=imports[i];
+       if(importsUse.indexOf(item)===-1){
+            importsUse[importsUse.length]=(item);
+      }
+   }
+
+    var id=fieldsPrimary[0];
+    
+    return {
+      "id": id,
+      "imports":importsUse
+    };
+})(vm);

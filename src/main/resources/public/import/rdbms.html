@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Import From RDBMS</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+        .table-list-view {
+            border: 1px solid black;
+            padding: 5px;
+            overflow: auto;
+            flex: auto;
+            margin-right: 5px;
+        }
+
+        .options-view {
+            border: 1px solid black;
+            padding: 5px;
+            flex: auto;
+        }
+
+
+    </style>
+</head>
+<body>
+<article>
+    <Collapse v-model="currentPanel" accordion>
+        <Panel name="options">
+            Import Options
+            <section slot="content">
+
+                <p>
+                    下划线分隔列名转换为
+                    <select id="underlineSelect">
+                        <option value="camel">驼峰命名</option>
+                        <option value="keep">保持原样</option>
+                    </select>
+                </p>
+                <p>datetime转换为
+                    <select id="datetimeSelect">
+                        <option>java.time.LocalDateTime</option>
+                        <option>java.util.Date</option>
+                        <option>java.time.Instant</option>
+                    </select></p>
+                <p>timestamp转换为
+                    <select id="timestampSelect">
+                        <option>java.time.LocalDateTime</option>
+                        <option>java.util.Date</option>
+                        <option>java.time.Instant</option>
+                    </select></p>
+                <p>date转换为
+                    <select id="dateSelect">
+                        <option>java.time.LocalDate</option>
+                        <option>java.util.Date</option>
+                        <option>java.time.Instant</option>
+                    </select>
+                </p>
+            </section>
+        </Panel>
+        <Panel name="import">
+            Import
+            <section slot="content">
+                <header>
+                    <label>
+                        URL:<input id="host" list="url-data-list" maxlength="15" required>
+                        <datalist id="url-data-list">
+                            <option>jdbc:mysql://127.0.0.1:3306/test</option>
+                            <option>jdbc:oracle:thin://127.0.0.1:1521/test</option>
+                        </datalist>
+                    </label>
+                    <label>
+                        Driver:<input id="driver" style="width:60px;" maxlength="7" list="driver-data-list" required>
+                        <datalist id="driver-data-list">
+                            <option>oracle.jdbc.OracleDriver</option>
+                            <option>com.mysql.jdbc.Driver</option>
+                        </datalist>
+                    </label>
+                    <label>
+                        Account:<input id="username" type="text" style="width:100px;" value="root" required>
+                    </label>
+                    <label>
+                        Password:<input id="password" type="text" style="width:100px;" value="root" required>
+                    </label>
+                    <button id="connectionBtn">获取表</button>
+                </header>
+            </section>
+        </Panel>
+    </Collapse>
+</article>
+
+<script>
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                currentPanel: "import"
+            }
+        },
+        methods: {}
+
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Data Class Field Batch Modify</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+
+    </style>
+</head>
+<body>
+<article class="flex-column-start-stretch">
+    <section class="action-bar">
+        <i-button :disabled="submitButtonDisabled" type="primary" @click="handleSubmitBtnClick">Save</i-button>
+    </section>
+    <section class="flex-auto">
+        <textarea v-model="lines"
+                 class="fill-parent"
+                 placeholder="one line one field"></textarea>
+    </section>
+</article>
+<script>
+
+    const urlParams=new URLSearchParams(location.search);
+    const classId=urlParams.get("classId");
+    
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                fields:[],
+                lines: "",
+                oldLines:""
+            };
+        },
+        computed:{
+            submitButtonDisabled(){
+                let old=this.oldLines;
+                let current=this.lines;
+                return old===current;
+            },
+        },
+        methods: {
+            loadData(){
+                this.fetch.get("/api/data-class/{}/field/".replace("{}",classId)).then(rows=>{
+                        this.fields=rows;
+                        this.lines = fieldList2lines(rows);
+                        this.oldLines=this.lines;
+                });
+            },
+            handleSubmitBtnClick(){
+                let newFields=lines2FieldList(this.lines);
+                this.fetch.put("/api/data-class/{}/field/batch/".replace("{}",classId),newFields).then(data=>{
+                    this.$Message.success("Done");
+                    window.top.postsMessage({
+                        type:"ModDataClassFieldOK"
+                    });
+                });
+            },
+        },
+        created() {
+            this.loadData();
+        }
+    });
+
+
+
+    const FieldFormatter=(function (){
+        let format=function (f){
+            return String.format("{}({}{}{}{}\{{},{}\}{}):{}{}{}{}",
+                f.displayName,
+                f.primary?"@":"",
+                f.required?"+":"",
+                f.unique?"#":"",
+                f.name,
+                f.min,
+                f.max,
+                f.pattern?"/"+f.pattern+"/":"",
+                f.dataType+(f.subDataType?"<"+f.subDataType+">":""),
+                f.defaultValue?"="+f.defaultValue:"",
+                f.remark?"/*"+f.remark+"*/":"",
+                f.ext?"!"+f.ext.replaceAll("\n","\\n"):""
+            );
+        };
+        const parse=function (line){
+            let f={};
+            let startAt=line.indexOf("(");
+            f.displayName=line.substring(0,startAt);
+            let endAt=line.indexOf(")",startAt);
+            let namePart=line.substring(startAt+1,endAt);
+            parseNamePart(namePart,f);
+            parseMinMaxPart(namePart,f);
+            parsePatternPart(namePart,f);
+            let leftPart=line.substr(endAt+1);
+            parseDataTypePart(leftPart,f);
+            parseRemarkPart(leftPart,f);
+            parseExePart(leftPart,f);
+            return f;
+        };
+
+        const parseExePart=function (line,f){
+            let startAt=line.indexOf("!");
+            if(startAt!==-1){
+                f.ext=line.substr(startAt+1);
+            }
+        };
+
+        const parseRemarkPart=function (line,f){
+            let startAt=line.indexOf("/*");
+            if(startAt!==-1){
+                let endAt=line.indexOf("*/",startAt);
+                f.remark=line.substring(startAt+2,endAt);
+            }
+        };
+
+        const parseDataTypePart=function (line,f){
+            let startAt=line.indexOf(":");
+            let endAt=line.indexOf("=",startAt);
+            if(endAt===-1){
+                endAt=line.indexOf("/*",startAt);
+                if(endAt===-1){
+                    endAt=line.length;
+                }
+            }
+            let dataTypePart=line.substring(startAt+1,endAt);
+            startAt=dataTypePart.indexOf("<");
+            if(startAt!==-1){
+                endAt=dataTypePart.indexOf(">",startAt);
+                f.subDataType=dataTypePart.substring(startAt+1,endAt);
+                f.dataType=dataTypePart.substring(0,startAt);
+            }else{
+                f.dataType=dataTypePart.substr(0);
+            }
+        };
+        const parseNamePart=function (namePart,f){
+            f.primary=namePart.indexOf("@")!==-1;
+            f.unique=namePart.indexOf("#")!==-1;
+            f.required=namePart.indexOf("+")!==-1;
+
+            let startAt=0;
+            let endAt=namePart.length;
+            for(let i=0,len=namePart.length;i<len;i++){
+                let c=namePart.charAt(i);
+                if("#@+".indexOf(c)!==-1) {
+                    startAt = i;
+                }else if("{/".indexOf(c)!==-1){
+                    endAt=i;
+                    break;
+                }
+            }
+            f.name=namePart.substring(startAt+1,endAt);
+        };
+
+        const parseMinMaxPart=function (namePart,f){
+            let startAt=namePart.indexOf("{");
+            let endAt=0;
+            if(startAt!==-1) {
+                endAt= namePart.indexOf("}", startAt);
+                if(endAt===-1){
+                    return;
+                }
+                let minMaxPart = namePart.substring(startAt+1, endAt).trim();
+                startAt=minMaxPart.indexOf(",");
+                if(startAt===-1){
+                    minMaxPart=minMaxPart.trim();
+                    let v=parseInt(minMaxPart);
+                    if(!isNaN(v)){
+                        f.min=v;
+                        f.max=v;
+                    }
+                }else{
+                    let min=parseInt(minMaxPart.substring(0,startAt).trim());
+                    let max=parseInt(minMaxPart.substr(startAt+1).trim());
+                    if(!isNaN(min)){
+                        f.min=min;
+                    }
+                    if(!isNaN(max)){
+                        f.max=max;
+                    }
+                }
+            }
+
+        };
+
+        const parsePatternPart=function (namePart,f){
+            let startAt=namePart.indexOf("/");
+            if(startAt!==-1) {
+                let endAt = namePart.indexOf("/", startAt);
+                if(endAt===-1)return;
+                let patternPart = namePart.substring(startAt, endAt).trim();
+                if(patternPart){
+                    f.pattern=patternPart;
+                }
+            }
+        };
+
+        return {
+             format,parse
+        }
+    })();
+
+
+    const fieldList2lines=function (fields){
+         let lines=[];
+         for(let i=0,len=fields.length;i<len;i++){
+             let f=fields[i];
+             lines.push(FieldFormatter.format(f));
+         }
+         return lines.join("\n");
+    };
+
+    /**
+     * id(@+#id{20,20}):INTEGER
+     * @param lines
+     */
+    const lines2FieldList=function (lines){
+        let list=[];
+        lines=lines.trim().split(/\n+/);
+
+        for(let i=0,len=lines.length;i<len;i++){
+            let line=lines[i];
+            list.push(FieldFormatter.parse(line));
+        }
+        return list;
+
+    }
+
+
+
+
+</script>
+</body>
+</html>

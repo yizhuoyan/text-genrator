@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Text Template</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <script src="/lib/aa.js"></script>
+    <style>
+        aside {
+            width: 200px;
+            background: hsl(0, 50%, 95%);
+        }
+        main>iframe{
+            z-index: -999;
+            position: absolute;
+            top:0;
+            left:0;
+        }
+        main>iframe.active{
+            z-index: 0;
+            position: static;
+        }
+    </style>
+</head>
+<body>
+<article class="flex-row">
+    <aside>
+        <div v-if="viewTreeData.length==0" style="text-align: center" class="pad">
+            <i-button @click="handleAddViewBtnClick" type="primary">Add</i-button>
+        </div>
+
+        <Tree :data="viewTreeData" :load-data="loadTreeData" empty-text="暂无数据，请添加按钮添加"
+              @on-contextmenu="handleTreeContextMenu"
+             @on-select-change="handleTreeSelectChange">
+            <template slot="contextMenu">
+                <Dropdown-Item v-if="currentNode.kind==='namespace'" @click.native="handleAddViewBtnClick">Add</Dropdown-Item>
+                <Dropdown-Item v-if="currentNode.kind==='data'" @click.native="handleModViewBtnClick">Modify</Dropdown-Item>
+                <Dropdown-Item v-if="currentNode.kind==='data'" @click.native="handleDeleteViewBtnClick">Delete</Dropdown-Item>
+            </template>
+        </Tree>
+    </aside>
+    <main class="flex-overflow-auto">
+        <iframe ref="firstFrame" :class="{active:'firstFrame'==currentActiveFrame}"></iframe>
+        <iframe ref="secondFrame" :class="{active:'secondFrame'==currentActiveFrame}"></iframe>
+    </main>
+    <Modal v-model="frameDialog.visible"
+           :title="frameDialog.title"
+           width="auto"
+           class-name="vertical-center-modal"
+           footer-hide>
+        <iframe style="height: 90vh" :src="frameDialog.src"></iframe>
+    </Modal>
+</article>
+
+<script>
+
+    /**
+     * 树有三种节点类型
+     * 根节点
+     * 数据节点
+     * 命名空间节点
+     */
+    const list2tree = function (list) {
+        let map = new Map();
+        let rootSet = new Set();
+        for (let i = 0; i < list.length; i++) {
+            let item = list[i];
+            let namespace = item.namespace;
+            //无命名空间，直接放入根节点
+            if (!namespace) {
+                rootSet.add(row2treeNode(item));
+                continue;
+            }
+            let parts = namespace.split("/");
+            let childId,childNode, parentId,parentNode = null;
+            for (let j=0; j<parts.length;j++) {
+                childId = parts[j];
+                childNode = map.get(childId);
+                if (!childNode) {
+                    map.set(childId, childNode=row2treeNode(childId));
+                }
+                parentId = parts[j - 1];
+                if(parentId){
+                    parentNode = map.get(parentId);
+                    if (!parentNode) {
+                        map.set(parentId, parentNode = row2treeNode(parentId));
+                    }
+                    //判断是否已加入
+                    let children = parentNode.children;
+                    if (children.indexOf(childNode) === -1) {
+                        childNode.parent = parentNode;
+                        children.push(childNode);
+                        children.sort((a,b)=>a.title.localeCompare(b.title));
+                    }
+                }
+            }
+            let rootNode = map.get(parts[0]);
+            let lastBranchNode = map.get(parts[parts.length - 1]);
+            lastBranchNode.children.push(row2treeNode(item));
+            lastBranchNode.children.sort((a,b)=>a.title.localeCompare(b.title));
+            rootSet.add(rootNode);
+        }
+        //所有节点字母顺序
+        return [...rootSet].sort((a,b)=>a.title.localeCompare(b.title));
+    };
+
+    /**
+     * 实体数据转换树节点
+     */
+    const row2treeNode=function (item){
+
+        if((typeof item)==="string"){
+            return {
+                title: item,
+                id:item,
+                contextmenu: true,
+                kind:"namespace",
+                expand:true,
+                children:[]
+            };
+        }
+        return {
+            title: "{}.{}".replace("{}",item.name).replace("{}",item.fileType),
+            contextmenu: true,
+            kind:"data",
+            expand:true,
+            selected: item.selected,
+            data: item,
+            id:item.id
+        };
+    };
+    /**
+     * 获取节点的命名空间
+     * @param currentNode
+     * @returns {string|*}
+     */
+    const getNodeNamespace=function (currentNode){
+        switch (currentNode.kind){
+            case "root":  //根节点直接返回空字符串
+                return "";
+            case "data": //数据节点直接返回
+                return currentNode.data.namespace;
+            case "namespace":
+                let currentNodeNamespace = [];
+                while (currentNode) {
+                    currentNodeNamespace.push(currentNode.title);
+                    currentNode = currentNode.parent;
+                }
+                return currentNodeNamespace.reverse().join("/");
+        }
+        return "";
+    };
+
+
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                viewTreeData: [],
+                currentNode: {},
+                currentActiveFrame:"firstFrame",
+                frameDialog: {
+                    visible: false,
+                    title: "",
+                    src:null
+                }
+            }
+        },
+        methods: {
+            loadTreeData() {
+                this.fetch.get("/api/view/").then(list => {
+                    this.viewTreeData = list2tree(list);
+                });
+            },
+            //左键选中
+            handleTreeSelectChange(selectNodes, currentNode) {
+                //仅处理数据节点
+                if (currentNode.kind==="data") {
+                    this.currentNode = currentNode;
+                    let id=currentNode.data.id;
+                    if(this.currentActiveFrame==="firstFrame"){
+                      let secondFrame=this.$refs["secondFrame"];
+                      if(secondFrame.currentId!==id){
+                            secondFrame.src="/view/detail.html?id="+id;
+                            secondFrame.currentId=id;
+                      }
+                      this.currentActiveFrame="secondFrame";
+                    }else{
+                        let firstFrame=this.$refs["firstFrame"];
+                        if(firstFrame.currentId!==id){
+                            firstFrame.src="/view/detail.html?id="+id;
+                            firstFrame.currentId=id;
+                        }
+                        this.currentActiveFrame="firstFrame";
+                    }
+                    window.top.postsMessage({
+                        type:"CurrentVMNodeChange"
+                    },"*");
+                }
+            },
+            //右键选中
+            handleTreeContextMenu(data, event, position) {
+                //保存当前右键选中节点
+                this.currentNode = data;
+            },
+            handleAddViewBtnClick() {
+                let params = new URLSearchParams();
+                params.append("namespace", getNodeNamespace(this.currentNode));
+                this.frameDialog.src = "/view/add.html?" + params;
+                this.frameDialog.visible = true;
+                this.frameDialog.title = "Add View";
+            },
+            handleModViewBtnClick(){
+                let id=this.currentNode.data.id;
+                this.frameDialog.src = "/view/mod.html?id=" + id;
+                this.frameDialog.visible = true;
+                this.frameDialog.title = "Edit View";
+            },
+            handleDeleteViewBtnClick(){
+                let id=this.currentNode.data.id;
+                this.$Modal.confirm({
+                    content:"confirm?",
+                    okText:"Yes",
+                    cancelText:"No",
+                    onOk:function (){
+                        app.fetch.delete("/api/view/"+id).then(data=>{
+                            app.$Message.success("Deleting Done");
+                            app.form=null;
+                            window.top.postsMessage({
+                                type:"DeleteViewOK"
+                            });
+                        })
+                    }
+                });
+            }
+        },
+        created() {
+            this.loadTreeData();
+        },
+        mounted(){
+        }
+    });
+
+    window.addEventListener("AddViewOK",function(){
+        location.reload();
+    });
+    window.addEventListener("ModViewOK",function(){
+        location.reload();
+    });
+    window.addEventListener("DeleteViewOK",function(){
+        location.reload();
+    });
+</script>
+</body>
+</html>

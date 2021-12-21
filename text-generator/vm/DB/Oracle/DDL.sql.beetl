@@ -1,0 +1,22 @@
+import ./oracle.vm;
+import ./columnMapping.vm;
+
+
+DROP TABLE  "${tableName}";
+
+
+CREATE TABLE  "${tableName}"  (
+    <% for(f in fields){
+          if(f.primary){
+    %>
+    "${f.columnName}" ${f.columnType},
+       <%}else{%>
+    "${f.columnName}" ${f.columnType} ${f.required?'NOT NULL':''} ${f.defaultValue!=null? "DEFAULT "+f.defaultValue }  ${f.unique?'UNIQUE'} ,
+    <%}}%>
+    constraint  ${tableName}_pk  PRIMARY KEY (${pk.columnName})
+) 
+
+COMMENT ON TABLE "${tableName}" IS '${tableComment}';
+ <% for(f in fields){%>
+COMMENT ON COLUMN "${tableName}"."${f.columnName}" IS '${f.displayName}';
+  <%}%>

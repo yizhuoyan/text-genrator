@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Data Class Modify</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+
+    </style>
+</head>
+<body>
+<article>
+    <section class="action-bar">
+        <i-button :disabled="formChangedData==null" type="primary" @click="handleSubmitBtnClick">Save</i-button>
+        <i-button  type="danger" @click="handleRemoveBtnClick">Remove</i-button>
+    </section>
+    <i-form v-if="form!=null" :model="form" :label-width="200" class="pad">
+        <Form-Item label="namespace">
+            <i-input v-model="form.namespace" placeholder="Enter something..."></i-input>
+        </Form-Item>
+        <Form-Item label="name">
+            <i-input v-model="form.name" placeholder="Enter something..."></i-input>
+        </Form-Item>
+        <Form-Item label="displayName">
+            <i-input v-model="form.displayName" placeholder="Enter something..."></i-input>
+        </Form-Item>
+        <Form-Item label="remark">
+            <i-input v-model="form.remark" type="textarea"
+                     :autosize="{minRows: 2,maxRows: 5}"
+                     placeholder="Enter something..."></i-input>
+        </Form-Item>
+        <Form-Item label="ext">
+            <i-input v-model="form.ext" type="textarea"
+                     :autosize="{minRows: 5,maxRows: 20}"
+                     placeholder="yaml"></i-input>
+        </Form-Item>
+    </i-form>
+</article>
+<script>
+
+    const urlParams=new URLSearchParams(location.search);
+    const id=urlParams.get("id");
+    
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                form: null
+            };
+        },
+        computed:{
+            formChangedData(){
+                let old=this.oldForm;
+                let current=this.form;
+                let updateField={};
+                for(let key in old){
+                    if(current[key]!==old[key]){
+                        updateField[key]=current[key];
+                    }
+                }
+                if(Object.keys(updateField).length===0){
+                    return null;
+                }
+                return updateField;
+            },
+        },
+        methods: {
+            loadData(){
+              this.fetch.get("/api/data-class/"+id).then(data=>{
+                  this.form=data;
+                  this.oldForm=JSON.parse(JSON.stringify(data));
+              });
+            },
+            handleSubmitBtnClick(){
+                if(this.formChangedData==null)return;
+                this.fetch.put("/api/data-class/"+id,this.formChangedData).then(data=>{
+                    this.$Message.success("Modifying Done");
+                    window.top.postsMessage({
+                        type:"ModDataClassOK"
+                    },"*");
+                });
+            },
+            handleRemoveBtnClick(evt){
+                this.$Modal.confirm({
+                    content:"Are You Sure?",
+                    okText:"Yes",
+                    cancelText:"No",
+                    onOk:function (){
+                        app.fetch.delete("/api/data-class/"+id).then(data=>{
+                            app.$Message.success("Delete Done");
+                            app.form=null;
+                            window.top.postsMessage({
+                                type:"DeleteDataClassOK"
+                            },"*");
+                        })
+                    }
+                });
+            },
+        },
+        created() {
+            this.loadData();
+        }
+    });
+</script>
+</body>
+</html>
