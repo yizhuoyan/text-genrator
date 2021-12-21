@@ -1,0 +1,30 @@
+import ./entity.vm;
+import JAVA/fieldTypeMapping.vm;
+
+package ${packageName ! "${packageName\}" }.entity;
+
+<%for(p in imports){%>
+import ${p};
+<%}%>
+
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.experimental.Accessors;
+import lombok.experimental.FieldDefaults;
+
+
+@Data
+@Accessors(chain = true)
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class ${ClassNameEntity}{
+    <% for(f in fields){%>
+   /**
+  * ${f.displayName}
+  <%if(f.remark!=null){%>
+  * ${f.remark}
+  <%}%>
+  */
+    ${f.fieldType} ${f.fieldName};
+    <%}%>
+
+}

@@ -1,0 +1,9 @@
+(function(vm){
+
+var tableName=$.toUnderlineCase(vm.name).toUpperCase();
+
+return {
+   "tableName": tableName,
+   "tableComment": vm.displayName
+};
+})(vm);

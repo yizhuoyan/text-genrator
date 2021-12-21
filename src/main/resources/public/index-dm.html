@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DATA MODEL</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+        aside {
+            width: 200px;
+            background: hsl(0, 50%, 95%);
+        }
+    </style>
+</head>
+<body>
+<article>
+    <section class="fill-parent flex-row">
+        <aside>
+            <Tree :data="classNodes" @on-contextmenu="handleTreeContextMenu" empty-text=""
+                  @on-select-change="handleTreeSelectChange">
+                <template slot="contextMenu">
+                    <Dropdown-Item v-if="currentNode.classType===0" @click.native="handleAddDataClassEntityBtnClick">Add
+                        Data Entity
+                    </Dropdown-Item>
+                    <Dropdown-Item v-if="currentNode.classType===1" @click.native="handleAddEnumClassEntityBtnClick">Add
+                        Enum Entity
+                    </Dropdown-Item>
+                </template>
+            </Tree>
+        </aside>
+        <main class="flex-overflow-auto">
+            <iframe :src="currentNodeDetailURL"></iframe>
+        </main>
+    </section>
+    <Modal v-model="addClassEntityDialog.visible"
+           :title="addClassEntityDialog.title"
+           footer-hide>
+        <iframe style="height: 500px" :src="addClassEntityDialog.src"></iframe>
+    </Modal>
+</article>
+
+<script>
+    const CLASS_TYPE_DATA = 0, CLASS_TYPE_ENUM = 1;
+
+
+    /**
+     * The tree has three kind of node
+     * 1: root node
+     * 2: data node
+     * 3: namespace node
+     */
+    const list2tree = function (classType, list) {
+        let map = new Map();
+        let rootSet = new Set();
+        for (let i = 0; i < list.length; i++) {
+            let item = list[i];
+            let namespace = item.namespace;
+            //no namespace as root node
+            if (!namespace) {
+                rootSet.add(class2treeNode(classType, item));
+                continue;
+            }
+            let parts = namespace.split("\.");
+            let childId, childNode, parentId, parentNode = null;
+            for (let j = 0; j < parts.length; j++) {
+                childId = parts[j];
+                childNode = map.get(childId);
+                if (!childNode) {
+                    map.set(childId, childNode = class2treeNode(classType, childId));
+                }
+                parentId = parts[j - 1];
+                if (parentId) {
+                    parentNode = map.get(parentId);
+                    if (!parentNode) {
+                        map.set(parentId, parentNode = class2treeNode(classType, parentId));
+                    }
+                    let children = parentNode.children;
+                    //has already contain the child
+                    if (children.indexOf(childNode) === -1) {
+                        childNode.parent = parentNode;
+                        children.push(childNode);
+                        children.sort((a,b)=>a.title.localeCompare(b.title));
+                    }
+                }
+            }
+            let rootNode = map.get(parts[0]);
+            let lastBranchNode = map.get(parts[parts.length - 1]);
+            lastBranchNode.children.push(class2treeNode(classType, item));
+            lastBranchNode.children.sort((a,b)=>a.title.localeCompare(b.title));
+            rootSet.add(rootNode);
+        }
+
+        return [...rootSet].sort((a,b)=>a.title.localeCompare(b.title));
+    };
+
+    /**
+     * 实体数据转换树节点
+     */
+    const class2treeNode = function (classType, item) {
+
+        if ((typeof item) === "string") {
+            return {
+                title: item,
+                contextmenu: true,
+                classType: classType,
+                kind: "namespace",
+                expand: true,
+                children: []
+            };
+        }
+        return {
+            title: "{}({})".replace("{}", item.displayName).replace("{}", item.name),
+            contextmenu: true,
+            classType: classType,
+            kind: "data",
+            expand: true,
+            data: item
+        };
+    };
+    /**
+     * 获取节点的命名空间
+     * @param currentNode
+     * @returns {string|*}
+     */
+    const getNodeNamespace = function (currentNode) {
+        switch (currentNode.kind) {
+            case "root":  //根节点直接返回空字符串
+                return "";
+            case "data": //数据节点直接返回
+                return currentNode.data.namespace;
+            case "namespace":
+                let currentNodeNamespace = [];
+                while (currentNode) {
+                    currentNodeNamespace.push(currentNode.title);
+                    currentNode = currentNode.parent;
+                }
+                return currentNodeNamespace.reverse().join(".");
+        }
+        return "";
+    }
+
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                classNodes: [{
+                    title: "Data Entity",
+                    expand: true,
+                    contextmenu: true,
+                    classType: CLASS_TYPE_DATA,
+                    kind: "root",
+                    children: []
+                }, {
+                    title: "Enum Entity",
+                    expand: true,
+                    contextmenu: true,
+                    kind: "root",
+                    classType: CLASS_TYPE_ENUM,
+                    children: []
+                }],
+                currentNode: {},
+                currentNodeDetailURL: null,
+                addClassEntityDialog: {
+                    visible: false,
+                    title: "",
+                    src: null
+                }
+            }
+        },
+        computed: {
+
+            fieldManageURL() {
+                let params = new URLSearchParams();
+                params.append("classId", this.modForm.id);
+                return "/class/field.html?" + params;
+            }
+        },
+        methods: {
+            loadDataClassDataTree() {
+                this.fetch.get("/api/data-class/").then(list => {
+                    this.classNodes[0].children = list2tree(CLASS_TYPE_DATA, list);
+                });
+            },
+            loadEnumClassDataTree() {
+                this.fetch.get("/api/enum-class/").then(list => {
+                    this.classNodes[1].children = list2tree(CLASS_TYPE_ENUM, list);
+                });
+            },
+            //左键选中
+            handleTreeSelectChange(selectNodes, currentNode) {
+                //仅处理数据节点
+                if (currentNode.kind === "data") {
+                    this.currentNode = currentNode;
+                    if (currentNode.classType === CLASS_TYPE_DATA) {
+                        this.currentNodeDetailURL = "/data-class/mod.html?id=" + currentNode.data.id;
+                    } else {
+                        this.currentNodeDetailURL = "/enum-class/mod.html?id=" + currentNode.data.id;
+                    }
+                }
+            },
+            //右键选中
+            handleTreeContextMenu(data, event, position) {
+                //保存当前右键选中节点
+                this.currentNode = data;
+            },
+            handleAddDataClassEntityBtnClick() {
+                let params = new URLSearchParams();
+                params.append("namespace", getNodeNamespace(this.currentNode));
+                this.addClassEntityDialog.src = "/data-class/add.html?" + params;
+                this.addClassEntityDialog.visible = true;
+                this.addClassEntityDialog.title = "Add Data Entity";
+            },
+            handleAddEnumClassEntityBtnClick() {
+                let params = new URLSearchParams();
+                params.append("namespace", getNodeNamespace(this.currentNode));
+                this.addClassEntityDialog.src = "/enum-class/add.html?" + params;
+                this.addClassEntityDialog.visible = true;
+                this.addClassEntityDialog.title = "Add Enum Entity";
+            }
+        },
+        created() {
+            this.loadDataClassDataTree();
+            this.loadEnumClassDataTree();
+        }
+    });
+
+    window.addEventListener("AddDataClassOK",function(){
+        this.addClassEntityDialog.visible = false;
+        app.loadDataClassDataTree();
+    });
+    window.addEventListener("ModDataClassOK",function(){
+        app.loadDataClassDataTree();
+        app.currentNodeDetailURL = null;
+    });
+    window.addEventListener("DeleteDataClassOK",function(){
+        app.loadDataClassDataTree();
+        app.currentNodeDetailURL = null;
+    });
+    window.addEventListener("AddEnumClassOK",function(){
+        app.addClassEntityDialog.visible = false;
+        app.loadEnumClassDataTree();
+        app.currentNodeDetailURL = null;
+    });
+    window.addEventListener("ModEnumClassOK",function(){
+        app.loadEnumClassDataTree();
+        app.currentNodeDetailURL = null;
+    });
+    window.addEventListener("DeleteEnumClassOK",function(){
+        app.loadEnumClassDataTree();
+        app.currentNodeDetailURL = null;
+    });
+</script>
+</body>
+</html>

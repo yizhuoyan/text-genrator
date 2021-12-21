@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Data Class Field</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+        .ivu-checkbox-wrapper{
+            margin-right: 0;
+        }
+        textarea.ivu-input{
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+<article>
+    <header class="action-bar">
+        <i-button  type="primary" @click="handleSubmitBtnClick">Save</i-button>
+        <i-button  type="normal" @click="handleBatchEditBtnClick">Batch Edit</i-button>
+    </header>
+    <section style="text-align: center;padding-right: 5px;padding-top: 5px">
+    <Row :gutter="5" align="top">
+        <i-col span="2">primary</i-col>
+        <i-col span="3">displayName</i-col>
+        <i-col span="2">name</i-col>
+        <i-col span="3">dataType</i-col>
+        <i-col span="1">required</i-col>
+
+        <i-col span="2">defaultValue</i-col>
+        <i-col span="1">unique</i-col>
+        <i-col span="2">min</i-col>
+        <i-col span="2">max</i-col>
+        <i-col span="2">pattern</i-col>
+        <i-col span="2">remark</i-col>
+        <i-col span="2">...</i-col>
+    </Row>
+    <Row :gutter="5" style="margin-bottom: 5px" type="flex" align="middle" v-for="row,i of rows" v-key="row.id">
+        <i-col  span="2">
+            <button-group>
+                <i-button size="small"><Checkbox v-model="row.primary" @on-change="(v)=>handleRowPrimaryChange(v,row)" title="主键"></Checkbox></i-button>
+                <i-button size="small" disabled>{{i+1}}</i-button>
+                <i-button size="small" @click="handleAddBtnClick(i,row)">+</i-button>
+                <i-button size="small" @click="handleRemoveBtnClick(i,row)">-</i-button>
+            </button-group>
+        </i-col>
+        <i-col span="3">
+            <i-input v-model="row.displayName"></i-input>
+        </i-col>
+        <i-col span="2">
+         <i-input v-model="row.name" ></i-input>
+        </i-col>
+        <i-col span="3">
+             <i-select :size="(row.dataType=='LIST')?'small':'normal'" v-model="row.dataType" @on-change="(v)=>handleDataTypeChange(v,row)">
+                 <i-option v-for="t of DATA_TYPES" v-key="t.value" :value="t.value" >
+                         {{t.displayName}}
+                 </i-option>
+             </i-select>
+            <i-input size="small"  v-if="row.dataType=='LIST'" v-model="row.subDataType"></i-input>
+        </i-col>
+        <i-col span="1">
+            <Checkbox :disabled="row.primary"  v-model="row.required"></Checkbox>
+        </i-col>
+
+        <i-col span="2">
+            <i-input :disabled="row.required" v-model="row.defaultValue"></i-input>
+        </i-col>
+        <i-col span="1">
+            <Checkbox :disabled="row.primary" v-model="row.unique"></Checkbox>
+        </i-col>
+        <i-col span="2" >
+            <i-input  type="number" :disabled="isDisabledMinMax(row)"  v-model="row.min">
+            </i-input>
+        </i-col>
+        <i-col span="2">
+            <i-input type="number" :disabled="isDisabledMinMax(row)"   v-model="row.max">
+            </i-input>
+        </i-col>
+        <i-col span="2" >
+            <i-input   v-model="row.pattern" >
+            </i-input>
+        </i-col>
+        <i-col span="2">
+            <i-input type="textarea" :autosize="{minRows: 3,maxRows: 5}" v-model="row.remark"></i-input>
+        </i-col>
+        <i-col span="2">
+            <i-input type="textarea"  :autosize="{minRows: 3,maxRows: 5}" v-model="row.ext" placeholder="need yaml format"></i-input>
+        </i-col>
+    </Row>
+    </section>
+
+    <Modal v-model="frameDialog.visible"
+           :title="frameDialog.title"
+           width="auto"
+           class-name="vertical-center-modal"
+           footer-hide>
+        <iframe style="height: 80vh" :src="frameDialog.src"></iframe>
+    </Modal>
+</article>
+<script>
+
+    const urlParams = new URLSearchParams(location.search);
+    const classId=urlParams.get("classId");
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                DATA_TYPES:[],
+                rows:[],
+                oldRows:[],
+                fieldsRows:"",
+                frameDialog:{
+                    visible: false,
+                    title: ""
+                }
+            }
+        },
+        methods: {
+            loadClassField(){
+               this.fetch.get("/api/data-class/{}/field/".replace("{}",classId)).then(data=>{
+                   if(data.length===0){
+                       this.rows=[{
+                           min:0,
+                           max:0
+
+                       }];
+                   }else {
+                       this.rows = data;
+                   }
+                   this.oldRows=JSON.parse(JSON.stringify(this.rows));
+
+               });
+            },
+            loadFieldDataTypes(){
+              this.fetch.get("/api/data-type/").then(rows=>{
+                 for(let i=rows.length;i-->0;){
+                     let row=rows[i];
+                     if(row.displayName!==row.value){
+                         row.displayName=row.displayName+"("+row.value+")";
+                     }
+                 }
+                 this.DATA_TYPES=rows;
+              }) ;
+            },
+            handleRowPrimaryChange(value,row){
+                   row.required=value;
+                   row.unique=value;
+            },
+            handleDataTypeChange(value,row){
+                if(value!=="LIST"){
+                    row.subDataType="";
+                }
+                switch (value){
+                    case "DATE":
+                    case "TIME":
+                    case "DATETIME":
+                    case "BOOLEAN":
+                    case "LIST":
+                        row.min=0;
+                        row.max=0;
+                        break;
+                }
+                switch (value){
+                    case "STRING":
+                        break;
+                    case "INTEGER":
+                        break;
+                    case "FLOAT":
+                        break;
+                    case "DATE":
+                    case "TIME":
+                    case "DATETIME":
+                        break;
+                    case "BOOLEAN":
+                        break;
+                    case "LIST":
+                        break;
+                }
+            },
+            isDisabledMinMax(row){
+               switch (row.dataType){
+                   case "STRING":
+                   case "INTEGER":
+                   case "FLOAT":
+                      return false;
+               }
+               return true;
+            },
+
+            handleAddBtnClick(i,row){
+                this.rows.splice(i+1,0,Object.assign({},row,{id:null}));
+            },
+            handleRemoveBtnClick(i,row){
+                this.rows.splice(i,1);
+            },
+            handleBatchEditBtnClick(){
+                this.frameDialog.visible=true;
+                this.frameDialog.title="Batch Edit";
+                this.frameDialog.src="/data-class/mod-fields-batch.html?classId="+classId;
+            },
+            handleSubmitBtnClick() {
+
+                let updateRows=[];
+                let rows=this.rows;
+                for(let i=rows.length;i-->0;){
+                    let current=rows[i];
+                    let old=this.oldRows[i]||{};
+                    let updateRow={};
+                    current["ordinal"]=i+1;
+                    for(let key in current){
+                        if(current[key]!==old[key]){
+                            updateRow[key]=current[key];
+                        }
+                    }
+                    if(Object.keys(updateRow).length===0){
+                        continue;
+                    }
+                    if(old["id"]) {
+                        updateRow["id"] = old["id"];
+                    }
+                    updateRows.push(updateRow);
+                }
+                this.fetch.post("/api/data-class/{}/field/".replace("{}",classId),updateRows).then(data=>{
+                    this.$Message.success("Done");
+                    this.loadClassField();
+                });
+            }
+        },
+        created() {
+            this.loadClassField();
+            this.loadFieldDataTypes();
+        }
+    });
+
+    window.addEventListener("ModDataClassFieldOK",function (){
+        app.frameDialog.visible=false;
+        app.loadClassField();
+    })
+</script>
+</body>
+</html>

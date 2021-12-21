@@ -1,0 +1,10 @@
+import ./mysql.vm;
+import ./columnMapping.vm;
+
+
+
+insert into `${tableName}`(<%for(f in fields){%>`${f.columnName}`${fLP.last?'':','}<%}%>)
+values(<%for(f in fields){%>#{${f.name}}${fLP.last?'':','}<%}%>);
+
+insert into `${tableName}`(<%for(f in fields){%>`${f.columnName}`${fLP.last?'':','}<%}%>)values(<%for(f in fields){%>? ${fLP.last?'':','}<%}%>);
+

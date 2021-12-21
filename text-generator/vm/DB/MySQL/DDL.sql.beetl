@@ -1,0 +1,12 @@
+import ./mysql.vm;
+import ./columnMapping.vm;
+
+
+
+
+CREATE TABLE IF NOT EXISTS `${tableName}`  (
+    <% for(f in fields){%>
+    `${f.columnName}` ${f.columnType} ${f.required?'NOT NULL':''} ${f.defaultValue!=null? "DEFAULT "+f.defaultValue } ${f.increment!false?'AUTO_INCREMENT'} ${f.unique?'UNIQUE'}  COMMENT '${f.displayName}',
+    <%}%>
+    PRIMARY KEY (`${pk.columnName}`)
+) COMMENT '${tableComment}';

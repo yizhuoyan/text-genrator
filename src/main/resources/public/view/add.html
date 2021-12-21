@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>视图模板</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+
+    </style>
+</head>
+<body>
+<article class="pad">
+    <section class="action-bar">
+        <i-button type="primary" @click="handleSubmitBtnClick">Save</i-button>
+    </section>
+    <i-form :model="form" :label-width="100">
+        <Form-Item label="File Type">
+            <i-select v-model="form.fileType">
+                <i-option value="js">Function</i-option>
+                <i-option value="vm">View Model</i-option>
+                <i-option value="beetl">Beetl Template</i-option>
+            </i-select>
+        </Form-Item>
+        <Form-Item label="Namespace">
+            <i-input v-model="form.namespace"  placeholder="Split With '/'"></i-input>
+        </Form-Item>
+        <Form-Item label="File Name">
+            <i-input v-model="form.name" placeholder="File Name"></i-input>
+        </Form-Item>
+    </i-form>
+</article>
+<script>
+
+    const urlParams=new URLSearchParams(location.search);
+
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                form: {
+                    namespace:urlParams.get("namespace"),
+                    fileType: "js"
+                }
+            };
+        },
+        methods: {
+            handleSubmitBtnClick(){
+                this.fetch.post("/api/view/",this.form).then(data=>{
+                    window.top.postsMessage({
+                        type:"AddViewOK"
+                    });
+                    this.$Message.success("Adding Done");
+                });
+            }
+        },
+        created() {
+
+        }
+    });
+</script>
+</body>
+</html>

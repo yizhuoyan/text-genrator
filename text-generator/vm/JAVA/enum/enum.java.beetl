@@ -1,0 +1,17 @@
+import ./enum.vm;
+
+package ${packageName ! "${packageName\}" }.entity;
+
+
+public enum ${EnumName}{
+    <% for(f in fields){%>
+   /**
+  * ${f.displayName}
+  <%if(f.remark!=null){%>
+  * ${f.remark}
+  <%}%>
+  */
+    ${f.enumName}${fLP.last?'':','}
+    <%}%>
+
+}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mod Enum Fields</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+        textarea.ivu-input{
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+<article>
+    <header class="action-bar">
+        <i-button  type="primary" @click="handleSubmitBtnClick">保存</i-button>
+    </header>
+    <section style="text-align: center;padding-right: 15px;padding-top: 5px">
+        <Row :gutter="5" align="top">
+            <i-col span="2">#</i-col>
+            <i-col span="2">value</i-col>
+            <i-col span="2">name</i-col>
+            <i-col span="3">displayName</i-col>
+            <i-col span="5">remark</i-col>
+            <i-col span="3">...</i-col>
+        </Row>
+        <Row :gutter="5" style="margin-bottom: 5px" type="flex"  align="middle" v-for="row,i of rows" v-key="row.id">
+            <i-col span="2">
+                <button-group>
+                    <i-button size="small" disabled>{{i+1}}</i-button>
+                    <i-button size="small" @click="handleAddBtnClick(i,row)">+</i-button>
+                    <i-button size="small" @click="handleRemoveBtnClick(i,row)">-</i-button>
+                </button-group>
+            </i-col>
+            <i-col span="2">
+                <i-input v-model="row.value"/>
+            </i-col>
+            <i-col span="2">
+                <i-input v-model="row.name"/>
+            </i-col>
+            <i-col span="3">
+                <i-input v-model="row.displayName"></i-input>
+            </i-col>
+            <i-col span="5">
+                <i-input type="textarea" :autosize="{minRows: 3,maxRows: 6}" v-model="row.remark"/>
+            </i-col>
+            <i-col span="3">
+                <i-input type="textarea" :autosize="{minRows: 3,maxRows: 6}" v-model="row.ext" placeholder="need yaml format"/>
+            </i-col>
+        </Row>
+    </section>
+</article>
+<script>
+
+    const urlParams = new URLSearchParams(location.search);
+    const classId=urlParams.get("classId");
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                classId: classId,
+                rows: [],
+                oldRows:[]
+            }
+        },
+        methods: {
+            loadEnumField() {
+                this.fetch.get("/api/enum-class/{}/field/".replace("{}",classId)).then(data => {
+                    if(data.length===0){
+                        this.rows=[{}];
+                    }else {
+                        this.rows = data;
+                    }
+                    this.oldRows=JSON.parse(JSON.stringify(this.rows));
+                });
+            },
+            handleAddBtnClick(i, row) {
+                this.rows.splice(i + 1, 0, Object.assign({},row,{id:null}));
+            },
+            handleRemoveBtnClick(i, row) {
+                this.rows.splice(i, 1);
+            },
+            handleSubmitBtnClick() {
+                let updateRows=[];
+                let rows=this.rows;
+                for(let i=rows.length;i-->0;){
+                    let current=rows[i];
+                    let old=this.oldRows[i]||{};
+                    let updateRow={};
+                    current["ordinal"]=i+1;
+                    for(let key in current){
+                        if(current[key]!==old[key]){
+                            updateRow[key]=current[key];
+                        }
+                    }
+                    if(Object.keys(updateRow).length===0){
+                        continue;
+                    }
+                    if(old["id"]) {
+                        updateRow["id"] = old["id"];
+                    }
+                    updateRows.push(updateRow);
+                }
+                this.fetch.post("/api/enum-class/{}/field/".replace("{}",classId),updateRows).then(data=>{
+                    this.$Message.success("Done");
+                    this.loadEnumField();
+                });
+            }
+        },
+        created() {
+            this.loadEnumField();
+        }
+    });
+</script>
+</body>
+</html>

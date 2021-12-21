@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Detail</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+        .tree-title{
+            text-align: center;
+            font-size: 100%;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<article>
+    <header class="action-bar">
+        <i-button type="primary" @click="handleSaveBtnClick">Save</i-button>
+        <i-button type="primary" @click="handleSaveAndExecuteBtnClick">Save && Execute</i-button>
+        <i-button type="danger" @click="handleRemoveBtnClick">Delete</i-button>
+    </header>
+
+    <i-form v-if="form!=null" :model="form" :label-width="100" class="pad">
+
+        <Row>
+            <i-col span="12">
+                <Form-Item label="Namespace">
+                    <i-input v-model="form.namespace" placeholder="Split with '/'"></i-input>
+                </Form-Item>
+            </i-col>
+            <i-col span="12">
+                <Form-Item label="Task Name">
+                    <i-input v-model="form.name" placeholder="Task Name"></i-input>
+                </Form-Item>
+            </i-col>
+        </Row>
+        <Row>
+            <i-col span="24">
+                <Form-Item label="Task Config">
+                    <i-input type="textarea" rows="5" v-model="form.taskConfig" placeholder="yaml"></i-input>
+                </Form-Item>
+            </i-col>
+        </Row>
+        <Row>
+            <i-col span="11">
+                <h6 class="tree-title">Data Model</h6>
+                <Tree :data="dataModelTree" @on-check-change="handleDataModelTreeCheckedNodesChange" show-checkbox></Tree>
+            </i-col>
+            <i-col span="11" push="2">
+                <h6 class="tree-title">View Model</h6>
+                <Tree :data="templateFileTree" @on-check-change="handleTemplateFileTreeCheckedNodesChange" show-checkbox></Tree>
+            </i-col>
+        </Row>
+
+
+    </i-form>
+</article>
+<script>
+    const urlParams = new URLSearchParams(location.search);
+    const id = urlParams.get("id");
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                form: null,
+                dataModelTree: [],
+                templateFileTree: [],
+            };
+        },
+        computed: {
+            formChangedData() {
+                let old = this.oldForm;
+                let current = this.form;
+                let updateField = {};
+                for (let key in old) {
+                    if (current[key] !== old[key]) {
+                        updateField[key] = current[key];
+                    }
+                }
+                if (Object.keys(updateField).length === 0) {
+                    return null;
+                }
+                return updateField;
+            },
+        },
+        methods: {
+            loadData() {
+                return this.fetch.get("/api/task/" + id).then(data => {
+                    this.form = data;
+                    this.oldForm = JSON.parse(JSON.stringify(data));
+                    return data;
+                });
+            },
+            loadDataModelTree(){
+                return this.fetch.get("/api/class/").then(list => {
+                    this.dataModelTree = list2tree(list,dataModel2treeNode);
+                    return list;
+                });
+            },
+            loadTemplateFileTree(){
+                return this.fetch.get("/api/view/template/").then(list => {
+                    this.templateFileTree = list2tree(list,templateViewFile2treeNode);
+                    return list;
+                });
+            },
+            checkTreeNodes(nodes,ids){
+                if(!ids||ids.length===0)return;
+                if(!nodes||nodes.length===0)return;
+
+                for(let i=0;i<nodes.length;i++){
+                    let node=nodes[i];
+                    if(ids.indexOf(String(node.id))!==-1){
+                        node.checked=true;
+                    }
+                    if(node.children) {
+                        this.checkTreeNodes(node.children,ids);
+                    }
+                }
+            },
+            handleDataModelTreeCheckedNodesChange(nodes,current){
+                this.form.dataModels=nodes.filter(n=>n.data).map(n=>n.id).join(",");
+            },
+            handleTemplateFileTreeCheckedNodesChange(nodes,current){
+                this.form.templateFiles=nodes.filter(n=>n.data).map(n=>n.id).join(",");
+
+            },
+            handleSaveBtnClick() {
+                if (this.formChangedData == null) return;
+                this.fetch.put("/api/task/" + id, this.formChangedData).then(data => {
+                    this.$Message.success("Modifying Done");
+                    window.top.postsMessage({
+                        type: "ModTaskOK"
+                    });
+                });
+            },
+            handleSaveAndExecuteBtnClick() {
+                const loadingCloseCallback=this.$Message.loading({
+                    content: 'Loading...',
+                    duration: 0
+                });
+                if (this.formChangedData == null){
+                    location.href="/api/task/" + id+"/execute/";
+                    loadingCloseCallback();
+                    return;
+                }
+                this.fetch.put("/api/task/" + id, this.formChangedData).then(data => {
+                    window.top.postsMessage({
+                        type: "ModTaskOK"
+                    });
+                }).then(data=>{
+
+                    location.href="/api/task/" + id+"/execute/";
+                }).finally(d=>{
+                    loadingCloseCallback();
+                });
+
+
+            },
+            handleRemoveBtnClick(evt) {
+                this.$Modal.confirm({
+                    content: "confirm?",
+                    okText: "Yes",
+                    cancelText: "No",
+                    onOk: function () {
+                        app.fetch.delete("/api/task/" + id).then(data => {
+                            app.$Message.success("Deleting Done");
+                            app.form = null;
+                            window.location.href="";
+                            window.top.postsMessage({
+                                type: "DeleteTaskOK"
+                            });
+                        })
+                    }
+                });
+            },
+        },
+        created() {
+            this.loadData().then(data=>{
+                if(data.dataModels) {
+                    let dataModelIds = data.dataModels.split(",");
+                    this.checkTreeNodes(this.dataModelTree, dataModelIds);
+                }
+                if(data.templateFiles) {
+                    let templateFileIds = data.templateFiles.split(",");
+                    this.checkTreeNodes(this.templateFileTree, templateFileIds);
+                }
+            });
+            this.loadDataModelTree().then(data=>{
+                if(this.form&&this.form.dataModels){
+                    let ids=this.form.dataModels.split(",");
+                    this.checkTreeNodes(this.dataModelTree,ids);
+                }
+            })
+            this.loadTemplateFileTree().then(data=>{
+                if(this.form&&this.form.templateFiles){
+                    let ids=this.form.templateFiles.split(",");
+                    this.checkTreeNodes(this.templateFileTree,ids);
+                }
+            })
+        }
+    });
+
+
+    const list2tree = function (list,row2treeNode) {
+        let map = new Map();
+        let rootSet = new Set();
+        for (let i = 0; i < list.length; i++) {
+            let item = list[i];
+            let namespace = item.namespace;
+            //无命名空间，直接放入根节点
+            if (!namespace) {
+                rootSet.add(row2treeNode(item));
+                continue;
+            }
+            let parts = namespace.split("/");
+            let childId,childNode, parentId,parentNode = null;
+            for (let j=0; j<parts.length;j++) {
+                childId = parts[j];
+                childNode = map.get(childId);
+                if (!childNode) {
+                    map.set(childId, childNode=row2treeNode(childId));
+                }
+                parentId = parts[j - 1];
+                if(parentId){
+                    parentNode = map.get(parentId);
+                    if (!parentNode) {
+                        map.set(parentId, parentNode = row2treeNode(parentId));
+                    }
+                    //判断是否已加入
+                    let children = parentNode.children;
+                    if (children.indexOf(childNode) === -1) {
+                        childNode.parent = parentNode;
+                        children.push(childNode);
+                        children.sort((a,b)=>a.title.localeCompare(b.title));
+                    }
+                }
+            }
+            let rootNode = map.get(parts[0]);
+            let lastBranchNode = map.get(parts[parts.length - 1]);
+            lastBranchNode.children.push(row2treeNode(item));
+            lastBranchNode.children.sort((a,b)=>a.title.localeCompare(b.title));
+            rootSet.add(rootNode);
+        }
+        //所有节点字母顺序
+        return [...rootSet].sort((a,b)=>a.title.localeCompare(b.title));
+    };
+
+    /**
+     * 实体数据转换树节点
+     */
+    const dataModel2treeNode=function (item){
+        if((typeof item)==="string"){
+            return {
+                title: item,
+                id:item,
+                expand:true,
+                checked:false,
+                children:[]
+            };
+        }
+        return {
+            title: item.name,
+            expand:true,
+            checked:false,
+            data: item,
+            id:item.id
+        };
+    };
+
+    const templateViewFile2treeNode=function (item){
+        if((typeof item)==="string"){
+            return {
+                title: item,
+                id:item,
+                expand:true,
+                checked:false,
+                children:[]
+            };
+        }
+        return {
+            title: "{}.{}".replace("{}",item.name).replace("{}",item.fileType),
+            expand:true,
+            data: item,
+            checked:false,
+            id:item.id
+        };
+    };
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+(function(vm){
+
+var packageName=vm.packageName||"${packageName}";
+var enumName=$.upperFirstChar(vm.name);
+var directoryName=packageName.replace(/\./g,"/");
+var fields=vm.fields;
+for(var i=fields.length;i-->0;){
+   var f=fields[i];
+   f.enumName=f.name.toUpperCase();
+}
+
+return {
+   "EnumName": enumName,
+   "directoryName": directoryName,
+  "fields": fields 
+};
+})(vm);

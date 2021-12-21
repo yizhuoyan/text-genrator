@@ -1,0 +1,56 @@
+var PK_TYPE="NUMBER(20)";
+
+
+var determineColumnType=function(field){
+    switch(field.dataType){
+        case "STRING":
+            if(field.min===field.max){
+                return "CHAR("+field.max+")";
+            }else  if(field.max<=4000){
+                return "VARCHAR2("+field.max+")";
+            }else{
+                return "CLOB";
+            }
+        case  "INTEGER":
+            return "NUMBER("+field.max+")";
+          
+        case "FLOAT":
+            return  "NUMBER("+field.max+","+field.scale||0+")";
+        case "DATE":
+            return  "DATE";
+        case "TIME":
+            return  "DATE";
+        case "DATETIME":
+            return "DATE";
+        case "BOOLEAN":
+            return "NUMBER(1)";
+        case "ENUM":
+            return "NUMBER(3)";
+    }
+    return PK_TYPE;
+
+};
+(function(vm){
+    var fields=vm.fields;
+    var pks=[];
+    var columnsNoPk=[];
+    for(var i=fields.length;i-->0;){
+        var field=fields[i];
+        field.columnType=determineColumnType(field);
+        field.columnName=$.toUnderlineCase(field.name).toUpperCase();
+        if(field.primary){
+            pks.push(field);
+        }else{
+           columnsNoPk.push(field);
+        }
+       
+    }
+
+ 
+    return {
+       "pk":pks[0],
+      "pks": pks,
+      "columnsNoPk": columnsNoPk,
+     "columns": fields
+   };
+})(vm);

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Text-Generator</title>
+    <link rel="stylesheet" href="/common.css">
+    <link rel="stylesheet" href="/lib/iview/iview.css">
+
+    <script src="/lib/vue/vue.min.js"></script>
+    <script src="/lib/iview/iview.min.js"></script>
+    <script src="/common.js"></script>
+    <style>
+        .action-bar-dm {
+            background: hsl(0, 100%, 50%);
+            line-height: 30px;
+            cursor: pointer;
+            color: white;
+            padding-left: 1em;
+            display: flex;
+            flex-flow: row nowrap;
+            justify-content: flex-start;
+            align-items: center;
+        }
+
+        .action-bar-dm:hover {
+            background: hsl(0, 100%, 55%);
+        }
+
+        .action-bar-vm {
+            background: hsl(270, 100%, 40%);
+            line-height: 30px;
+            cursor: pointer;
+            color: white;
+            padding-left: 1em;
+        }
+
+        .action-bar-vm:hover {
+            background: hsl(270, 100%, 45%);
+        }
+
+        .action-bar-task {
+            background: hsl(200, 100%, 40%);
+            line-height: 30px;
+            cursor: pointer;
+            color: white;
+            padding-left: 1em;
+        }
+
+        .action-bar-task:hover {
+            background: hsl(200, 100%, 45%);
+        }
+        .section-hidden {
+            max-height: 30px;
+            overflow: hidden;
+        }
+
+        .section-visible {
+            flex: auto;
+        }
+
+    </style>
+</head>
+<body>
+<article class="flex-column-start-stretch">
+    <section :class="determineVisibleClass('dm')" class="flex-column-start-stretch">
+        <header @click="currentActiveSection='dm'" class="action-bar-dm">
+            <h1>Data Model</h1>
+            <Dropdown style="margin-left: 1em" @on-click="handleImportMenuClick">
+                <a href="javascript:void(0)">
+                    Import
+                    <Icon type="ios-arrow-down"></Icon>
+                </a>
+                <Dropdown-Menu slot="list">
+                    <Dropdown-Item name="RDBMS">From RDBMS</Dropdown-Item>
+                    <Dropdown-Item name="DDL">From DDL-Create</Dropdown-Item>
+                    <Dropdown-Item name="Excel" divided>From Excel</Dropdown-Item>
+                    <Dropdown-Item name="YAML">From YAML</Dropdown-Item>
+                    <Dropdown-Item name="JSON">From JSON</Dropdown-Item>
+                </Dropdown-Menu>
+            </Dropdown>
+        </header>
+        <main class="flex-auto">
+            <iframe src="index-dm.html"></iframe>
+        </main>
+    </section>
+    <section :class="determineVisibleClass('vm')" class="flex-column-start-stretch">
+        <header @click="currentActiveSection='vm'" class="action-bar-vm">
+            <h1>View Model</h1>
+        </header>
+        <main class="flex-auto">
+            <iframe src="index-vm.html"></iframe>
+        </main>
+    </section>
+    <section :class="determineVisibleClass('task')" class="flex-column-start-stretch">
+        <header @click="currentActiveSection='task'" class="action-bar-task">
+            <h1>Task Manage</h1>
+        </header>
+        <main class="flex-auto">
+            <iframe src="index-task.html"></iframe>
+        </main>
+    </section>
+    <Modal :title="importDialog.title" width="95vw" v-model="importDialog.visible" class-name="vertical-center-modal">
+        <iframe :src="importDialog.src" style="height:80vh"></iframe>
+        <div slot="footer"></div>
+    </Modal>
+</article>
+<script>
+    const app = new Vue({
+        el: "body>article",
+        data() {
+            return {
+                currentActiveSection: "task",
+                importDialog:{
+                    visible:false,
+                    title:null,
+                    src:null
+                }
+            }
+        },
+        methods: {
+            determineVisibleClass(name) {
+                if (this.currentActiveSection !== name) {
+                    return "section-hidden";
+                }
+                return "section-visible";
+            },
+            handleImportRDBMSBtnClick(){
+                this.importDialog.title="From RDBMS";
+                this.importDialog.src="/import/rdbms.html";
+                this.importDialog.visible=true;
+            },
+            handleImportDDLBtnClick(){
+                this.importDialog.title="From DDL-Create";
+                this.importDialog.visible=true;
+                this.importDialog.src=true;
+            },
+            handleImportMenuClick(name){
+                this["handleImport"+name+"BtnClick"]();
+            }
+        }
+
+    });
+</script>
+</body>
+</html>
